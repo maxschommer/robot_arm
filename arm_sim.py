@@ -2,6 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.widgets import Slider, Button, RadioButtons
+from matplotlib.patches import Circle
+
+import mpl_toolkits.mplot3d.art3d as art3d
 import math
 import seaborn as sns
 
@@ -97,18 +100,10 @@ arm.add_joint([0,1,0], [0, 0, 0])
 arm.add_joint([2,0,6], [2,0,6])
 arm.add_joint([0,1,0], [6,0,6])
 arm.add_joint([0,1,0], [10,0,8])
+arm.add_joint([0,1,0], [13,0,8])
 arm.plot_arm()
 
 print(arm)
-
-#Base Coordinate
-base = [0,0,0]
-should = [2,0,6]
-
-should_len = np.vstack((base, should))
-#b, = ax.plot(*should_len.T)
-#prev_line = b
-
 
 def rotation_matrix(axis, theta):
     """
@@ -125,5 +120,37 @@ def rotation_matrix(axis, theta):
                      [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
                      [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
 
+def plot_3D_cylinder(radius, height, fig=arm.fig, elevation=0, resolution=100, color='r', x_center = 0, y_center = 0):
+    
+    ax = Axes3D(fig, azim=30, elev=30)
+
+    x = np.linspace(x_center-radius, x_center+radius, resolution)
+    z = np.linspace(elevation, elevation+height, resolution)
+    X, Z = np.meshgrid(x, z)
+
+    Y = np.sqrt(radius**2 - (X - x_center)**2) + y_center # Pythagorean theorem
+
+    ax.plot_surface(X, Y, Z, linewidth=0, color=color)
+    ax.plot_surface(X, (2*y_center-Y), Z, linewidth=0, color=color)
+
+    floor = Circle((x_center, y_center), radius, color=color)
+    ax.add_patch(floor)
+    art3d.pathpatch_2d_to_3d(floor, z=elevation, zdir="z")
+
+    ceiling = Circle((x_center, y_center), radius, color=color)
+    ax.add_patch(ceiling)
+    art3d.pathpatch_2d_to_3d(ceiling, z=elevation+height, zdir="z")
+
+
+# params
+radius = 3
+height = 10
+elevation = -5
+resolution = 100
+color = 'r'
+x_center = 0
+y_center = 0
+
+plot_3D_cylinder(radius, height, elevation=elevation, resolution=resolution, color=color, x_center=x_center, y_center=y_center)
 
 plt.show()
