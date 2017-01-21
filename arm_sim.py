@@ -5,10 +5,6 @@ from matplotlib.widgets import Slider, Button, RadioButtons
 import math
 import seaborn as sns
 
-#fig = plt.figure()
-#ax = fig.add_subplot(111, projection="3d")
-#plt.subplots_adjust(left=0.25, bottom=0.25)
-
 class Arm:
     """This holds all of the positions of all of the joints, and the axis of roation of all of the segments""" 
 
@@ -62,7 +58,7 @@ class Arm:
                         pos_draw[j] = pos_draw[j]-pos_draw[i]
 
             rot_matrix = rotation_matrix(rot_axis_draw[i], self.s_joints[i].val) #This is determined by the value of the various sliders
-            #print(rot_matrix)
+            
             if not np.array_equal(pos_draw[i],  np.array([None, None,None])):  #This checks to make sure that None arrays are not subtracted
                 for k in range(i+1, len(rot_axis_draw)):
                     if not np.array_equal(pos_draw[k],  np.array([None, None,None])):
@@ -74,31 +70,15 @@ class Arm:
                 for j in range(i+1, len(pos_draw)): #Subtraction Loop that adds the first vector in each group from the following items.
                     if not np.array_equal(pos_draw[j],  np.array([None, None,None])): #Checks to make sure that a None vector isn't added to.
                         pos_draw[j] = pos_draw[j]+pos_draw[i]
-                #print(rot_matrix)
-
+                
             for k in range(i+1, len(rot_axis_draw)):
                 rot_axis_draw[k] = np.dot(rot_axis_draw[k], rot_matrix)
 
-        # for i in range(len(self.position)-1):
-        #     r_matrix.append(rotation_matrix(self.rot_axis[i], vals[i]))
-
-
-
-        # for j in range(len(self.position)-1):
-        #     for i in range(j, len(self.position)):
-        #         if self.position[j] != [None, None, None]:
-        #             if self.position[i] != [None,None,None]:
-        #                 print(self.position[j])
-        #                 pos_draw.append(np.dot(r_matrix[j], np.array(self.position[i])-np.array(self.position[j]))+np.array(self.position[j]))
-        #         else:
-        #             if self.position[i] != [None,None,None]:
-        #                 pos_draw.append(np.dot(r_matrix[j], np.array(self.position[i])))
         del_index = []
         for p in range(len(pos_draw)):
             if not np.array_equal(pos_draw[p],  np.array([None, None,None])):
                 del_index.append(pos_draw[p])
-       
-        #print(np.array(del_index))
+ 
         self.ax.cla()
         draw, = self.ax.plot(*np.array(del_index).T)
 
@@ -145,37 +125,5 @@ def rotation_matrix(axis, theta):
                      [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
                      [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
 
-
-#ax.set_xlim3d(-10, 10)
-#ax.set_ylim3d(-10, 10)
-#ax.set_zlim3d(0, 10)
-
-
-
-
-def update(val):
-    print('3')
-#     global prev_line
-    
-#     theta = srot_base.val
-
-
-#     axis_should = [0,0,1]
-#     should_len = np.dot(rotation_matrix(axis_should,theta), should)
-#     temp = np.vstack((base, should_len))
-#     ax.lines.remove(prev_line)
-#     prev_line, = ax.plot(*temp.T, color='b')
-#     fig.canvas.draw_idle()
-
-# srot_base.on_changed(update)
-
-# axcolor = 'lightgoldenrodyellow'
-# resetax = plt.axes([0.8, 0.025, 0.1, 0.04])
-# button = Button(resetax, 'Reset', color=axcolor, hovercolor='0.975')
-
-
-# def reset(event):
-#     srot_base.reset()
-# button.on_clicked(reset)
 
 plt.show()
