@@ -2,11 +2,28 @@ import numpy as np
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.widgets import Slider, Button, RadioButtons
-from matplotlib.patches import Circle
-
+from numpy import linalg as LA
 import mpl_toolkits.mplot3d.art3d as art3d
 import math
 import seaborn as sns
+
+
+
+def rotation_matrix(axis, theta):
+    """
+    Return the rotation matrix associated with counterclockwise rotation about
+    the given axis by theta radians.
+    """
+    axis = np.asarray(axis)
+    axis = axis/math.sqrt(np.dot(axis, axis))
+    a = math.cos(theta/2.0)
+    b, c, d = -axis*math.sin(theta/2.0)
+    aa, bb, cc, dd = a*a, b*b, c*c, d*d
+    bc, ad, ac, ab, bd, cd = b*c, a*d, a*c, a*b, b*d, c*d
+    return np.array([[aa+bb-cc-dd, 2*(bc+ad), 2*(bd-ac)],
+                     [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
+                     [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
+
 
 class Arm:
     """This holds all of the positions of all of the joints, and the axis of roation of all of the segments""" 
@@ -36,12 +53,18 @@ class Arm:
                 self.ax_joints.append(plt.axes([.25, i/20.+.02, 0.65, 0.03], axisbg="w"))
                 self.s_joints.append(Slider(self.ax_joints[i], "Base Rotation", -3.14159, 3.14159, valinit=0))
         self.lines_plot, = self.ax.plot(*np.array(self.lines).T)
+        
+        for i in range(len(self.position)-1):
+            if not np.array_equal(self.position[i],  self.position[i+1]):
+                x, y, z = self.gen_cylinder(self.position[i], self.position[i+1])
+                self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='b')
+
         print(self.s_joints[0].val)
         
         for i in range(len(self.position)-1):
             self.s_joints[i].on_changed(self.update)
 
-        self.ax.set_xlim3d(limits[0], 10)
+        self.ax.set_xlim3d(-10, 10)
         self.ax.set_ylim3d(-10, 10)
         self.ax.set_zlim3d(0, 10)
         
@@ -77,18 +100,63 @@ class Arm:
             for k in range(i+1, len(rot_axis_draw)):
                 rot_axis_draw[k] = np.dot(rot_axis_draw[k], rot_matrix)
 
-        del_index = []
+        final_draw = []
         for p in range(len(pos_draw)):
             if not np.array_equal(pos_draw[p],  np.array([None, None,None])):
-                del_index.append(pos_draw[p])
+                final_draw.append(pos_draw[p])
  
         self.ax.cla()
-        draw, = self.ax.plot(*np.array(del_index).T)
+        for i in range(len(final_draw)-1):
+            if not np.array_equal(final_draw[i],  final_draw[i+1]):
+                x, y, z = self.gen_cylinder(final_draw[i], final_draw[i+1])
+                self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='b')
+
+        draw, = self.ax.plot(*np.array(final_draw).T)
 
         self.ax.set_xlim3d(-10, 10)
         self.ax.set_ylim3d(-10, 10)
         self.ax.set_zlim3d(0, 10)
         self.fig.canvas.draw_idle()
+
+
+    def gen_cylinder(self, p1=[2,0,6], p2=[6,0,6], r=.75):
+        resolution = 15
+        #ax = Axes3D(fig, azim=30, elev=30)
+        p1 = np.array(p1)
+        p2 = np.array(p2)
+        diff = p2-p1
+        print(diff)
+        diff_xy = np.array([diff[0], diff[1]])
+
+        print(diff_xy)
+        if diff_xy[1] < 0:
+            azimuth = -math.acos(np.inner(diff_xy/LA.norm(diff_xy), np.array([1,0])))
+        else:
+            azimuth = math.acos(np.inner(diff_xy/LA.norm(diff_xy), np.array([1,0])))
+        elevation = math.acos(np.inner(diff/LA.norm(diff), np.array([0,0,1])))
+        print(azimuth)
+        print(elevation)
+        diff = p1-p2
+        mag = math.sqrt(diff[0]**2+diff[1]**2+diff[2]**2)
+        u = np.linspace(0, 2 * np.pi, resolution)
+        v = np.linspace(0, np.pi, resolution)
+        h = np.linspace(0,mag, resolution)
+        x = r*np.outer(np.cos(u), np.ones(np.size(v)))
+        y = r*np.outer(np.sin(u), np.ones(np.size(v)))
+        z = np.outer(np.ones(np.size(u)), h)
+        for i in range(resolution):
+            for j in range(resolution):
+                point = np.array([x[i][j], y[i][j], z[i][j]])
+                rot_matrix = rotation_matrix([0,0,1], azimuth) #This is determined by the value of the various sliders
+                rot_axis = np.dot(rot_matrix, np.array([0,1,0]))
+                rot_matrix_f = rotation_matrix(rot_axis, elevation)
+                point = np.dot(rot_matrix_f, point)
+                x[i][j] = point[0]+p1[0]
+                y[i][j] = point[1]+p1[1]
+                z[i][j] = point[2]+p1[2]
+
+        return x, y, z
+
     def __str__(self):
         pos_str = str(self.position)
         rot_str = str(self.rot_axis)
@@ -104,53 +172,4 @@ arm.add_joint([0,1,0], [13,0,8])
 arm.plot_arm()
 
 print(arm)
-
-def rotation_matrix(axis, theta):
-    """
-    Return the rotation matrix associated with counterclockwise rotation about
-    the given axis by theta radians.
-    """
-    axis = np.asarray(axis)
-    axis = axis/math.sqrt(np.dot(axis, axis))
-    a = math.cos(theta/2.0)
-    b, c, d = -axis*math.sin(theta/2.0)
-    aa, bb, cc, dd = a*a, b*b, c*c, d*d
-    bc, ad, ac, ab, bd, cd = b*c, a*d, a*c, a*b, b*d, c*d
-    return np.array([[aa+bb-cc-dd, 2*(bc+ad), 2*(bd-ac)],
-                     [2*(bc-ad), aa+cc-bb-dd, 2*(cd+ab)],
-                     [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
-
-def plot_3D_cylinder(radius, height, fig=arm.fig, elevation=0, resolution=100, color='r', x_center = 0, y_center = 0):
-    
-    ax = Axes3D(fig, azim=30, elev=30)
-
-    x = np.linspace(x_center-radius, x_center+radius, resolution)
-    z = np.linspace(elevation, elevation+height, resolution)
-    X, Z = np.meshgrid(x, z)
-
-    Y = np.sqrt(radius**2 - (X - x_center)**2) + y_center # Pythagorean theorem
-
-    ax.plot_surface(X, Y, Z, linewidth=0, color=color)
-    ax.plot_surface(X, (2*y_center-Y), Z, linewidth=0, color=color)
-
-    floor = Circle((x_center, y_center), radius, color=color)
-    ax.add_patch(floor)
-    art3d.pathpatch_2d_to_3d(floor, z=elevation, zdir="z")
-
-    ceiling = Circle((x_center, y_center), radius, color=color)
-    ax.add_patch(ceiling)
-    art3d.pathpatch_2d_to_3d(ceiling, z=elevation+height, zdir="z")
-
-
-# params
-radius = 3
-height = 10
-elevation = -5
-resolution = 100
-color = 'r'
-x_center = 0
-y_center = 0
-
-plot_3D_cylinder(radius, height, elevation=elevation, resolution=resolution, color=color, x_center=x_center, y_center=y_center)
-
 plt.show()
