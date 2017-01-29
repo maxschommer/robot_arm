@@ -7,6 +7,8 @@ import mpl_toolkits.mplot3d.art3d as art3d
 import math
 import seaborn as sns
 
+from vector import Vector
+
 
 class Arm:
     """This holds all of the positions of all of the joints, and the axis of roation of all of the segments""" 
@@ -26,9 +28,10 @@ class Arm:
         self.position.append(position)
 
 
-    def plot_arm(self, color='b', limits=[-10,10,-10,10,0,10], Plot=True): 
+    def plot_arm(self, limits=[-10,10,-10,10,0,10], Plot=True):
+        color = 'r' if self.is_self_intersecting(self.position) else 'b'
+
         plt.subplots_adjust(bottom=(0.05*len(self.position)))
-        
 
         for i in range(len(self.position)):
 
@@ -44,7 +47,7 @@ class Arm:
             for i in range(len(self.position)-1):
                 if not np.array_equal(self.position[i],  self.position[i+1]):
                     x, y, z = self.gen_cylinder(self.position[i], self.position[i+1])
-                    self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='b')
+                    self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
 
         for i in range(len(self.position)-1):
             self.s_joints[i].on_changed(self.update)
@@ -56,11 +59,12 @@ class Arm:
 
     def update(self, val):
         final_draw = self.get_arm_pos()
+        color = 'r' if self.is_self_intersecting(final_draw) else 'b'
         self.ax.cla()
         for i in range(len(final_draw)-1):
             if not np.array_equal(final_draw[i],  final_draw[i+1]):
                 x, y, z = self.gen_cylinder(final_draw[i], final_draw[i+1])
-                self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='b')
+                self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
 
         draw, = self.ax.plot(*np.array(final_draw).T)
 
@@ -139,6 +143,7 @@ class Arm:
 
         return final_draw
 
+
     """Work in progress"""
     def parameter_sweep(self, index=0, sweep=[]):
 
@@ -165,6 +170,84 @@ class Arm:
         return output
 
 
+    def is_self_intersecting(self, position_arr=None, thickness_arr=None):
+        """
+        Return True if the given set of points intersect themselves
+        """
+        if position_arr == None:
+            position_arr = self.get_arm_pos()
+        if thickness_arr == None:
+            thickness_arr = [.75]*(len(position_arr)-1)
+
+        for i in range(0,len(position_arr)-3):
+            for j in range(i+2, len(position_arr)-1):
+                x0, x1  = Vector(position_arr[i]), Vector(position_arr[i+1])
+                if x0 == x1: # define first arm
+                    break
+
+                y0, y1 = Vector(position_arr[j]), Vector(position_arr[j+1])
+                if y0 == y1: # define second arm
+                    continue
+
+                if dist(x0, x1, y0, y1) <= thickness_arr[i]+thickness_arr[j]:
+                    return True
+
+        return False
+
+
+def dist(x0, x1, y0, y1):
+    """
+    Distance between line segments x0->x1 and y0->y1
+    """
+    SMALL_NUM = 0.01
+    u = x1 - x0
+    v = y1 - y0
+    w = x0 - y0
+    a,b,c,d,e = u*u, u*v, v*v, u*w, v*w
+    D = a*c - b*b
+    sD, tD = D, D
+
+    if D <= SMALL_NUM:
+        sN = 0
+        sD = 1
+        tN = e
+        tD = c
+    else:
+        sN = (b*e - c*d)
+        tN = (a*e - b*d)
+        if sN < 0:
+            sN = 0
+            tN = e
+            tD = c
+        elif sN > sD:
+            sN = sD
+            tN = e + b
+            tD = c
+
+    if tN < 0:
+        tN = 0
+        if -d < 0:
+            sN = 0
+        elif -d > a:
+            sN = sD
+        else:
+            sN = -d
+            sD = a
+    elif tN > tD:
+        tN = tD
+        if -d + b < 0:
+            sN = 0
+        elif -d + b > a:
+            sN = sD
+        else:
+            sN = -d + b
+            sD = a
+
+    sc = 0 if abs(sN) <= SMALL_NUM else sN/sD
+    tc = 0 if abs(tN) <= SMALL_NUM else tN/tD
+    return abs(w + u*sc - v*tc)
+
+
 def rotation_matrix(axis, theta):
     """
     Return the rotation matrix associated with counterclockwise rotation about
@@ -187,7 +270,6 @@ arm.add_joint([2,0,6], [2,0,6])
 arm.add_joint([0,1,0], [6,0,6])
 arm.add_joint([0,1,0], [10,0,8])
 arm.add_joint([0,1,0], [13,0,8])
-arm.add_joint([1,2,3], [-2,-2,-4])
 arm.plot_arm()
 
 print(arm)
