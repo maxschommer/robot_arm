@@ -5,8 +5,11 @@ from matplotlib.widgets import Slider, Button, RadioButtons
 from numpy import linalg as LA
 import mpl_toolkits.mplot3d.art3d as art3d
 import math
+import random
 import seaborn as sns
-
+from scipy import stats
+from mayavi import mlab
+import multiprocessing
 
 class Arm:
     """This holds all of the positions of all of the joints, and the axis of roation of all of the segments""" 
@@ -140,24 +143,48 @@ class Arm:
         return final_draw
 
     """Work in progress"""
-    def parameter_sweep(self, index=0, sweep=[]):
+    def parameter_sweep(self, index=0, iterations=10000):
+        random.seed(5)
+        X=np.zeros(iterations)
+        Y=np.zeros(iterations)
+        Z=np.zeros(iterations)
+        for i in range(0, iterations):
+            for j in range(0, len(self.s_joints)):
+                self.s_joints[j].val =  random.uniform(self.s_joints[j].valmin, self.s_joints[j].valmax)
+            point = self.get_arm_pos()[-1]
+            X[i]= point[0]
+            Y[i]= point[1]
+            Z[i]= point[2]
+        #print(X)
+        x = X
+        y = Y    
+        z = Z
 
-        index = len(self.s_joints)-1
-        points = self.recursive_layer(dtheta=dtheta, voxel_dim=voxel_dim, index=index, sweep=sweep)
-        #self.ax.scatter(points[])
+        xyz = np.vstack([x,y,z])
+        kde = stats.gaussian_kde(xyz)
 
-    # def recursive_layer(self, dtheta, voxel_dim, index, sweep):
-    #     if index == 0:
-    #         #print(self.get_arm_pos())
-    #         points = self.get_arm_pos()
+        # Evaluate kde on a grid
+        xmin, ymin, zmin = x.min(), y.min(), z.min()
+        xmax, ymax, zmax = x.max(), y.max(), z.max()
+        xi, yi, zi = np.mgrid[xmin:xmax:30j, ymin:ymax:30j, zmin:zmax:30j]
+        coords = np.vstack([item.ravel() for item in [xi, yi, zi]]) 
+        density = kde(coords).reshape(xi.shape)
 
-    #         sweep.append(points[len(points)-1])
-    #         return sweep
-    #     else:
-    #         for a in np.linspace(-3.14, 3.14, num=5):
-    #             self.s_joints[index].val = a
-    #             sweep = self.recursive_layer(dtheta=dtheta, voxel_dim=voxel_dim, index=(index-1), sweep=sweep)
+        # Plot scatter with mayavi
+        figure = mlab.figure('DensityPlot')
 
+        grid = mlab.pipeline.scalar_field(xi, yi, zi, density)
+        min = density.min()
+        max=density.max()
+        mlab.pipeline.volume(grid, vmin=min, vmax=min + .5*(max-min))
+
+        mlab.axes()
+        mlab.show()
+        #points, sub = self.hist3d_bubble(X, Y, Z, bins=4)
+        #points = self.recursive_layer(dtheta=dtheta, voxel_dim=voxel_dim, index=index, sweep=sweep)
+        #self.ax.scatter(X, Y, Z)
+
+   
     def __str__(self):
         pos_str = str(self.position)
         rot_str = str(self.rot_axis)
@@ -187,8 +214,8 @@ arm.add_joint([2,0,6], [2,0,6])
 arm.add_joint([0,1,0], [6,0,6])
 arm.add_joint([0,1,0], [10,0,8])
 arm.add_joint([0,1,0], [13,0,8])
-arm.add_joint([1,2,3], [-2,-2,-4])
 arm.plot_arm()
 
+arm.parameter_sweep()
 print(arm)
 plt.show()
