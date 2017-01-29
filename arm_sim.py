@@ -46,7 +46,9 @@ class Arm:
        
             for i in range(len(self.position)-1):
                 if not np.array_equal(self.position[i],  self.position[i+1]):
-                    x, y, z = self.gen_cylinder(self.position[i], self.position[i+1])
+                    x, y, z = gen_cylinder(self.position[i], self.position[i+1])
+                    self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
+                    x, y, z = gen_sphere(self.position[i+1])
                     self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
 
         for i in range(len(self.position)-1):
@@ -63,9 +65,10 @@ class Arm:
         self.ax.cla()
         for i in range(len(final_draw)-1):
             if not np.array_equal(final_draw[i],  final_draw[i+1]):
-                x, y, z = self.gen_cylinder(final_draw[i], final_draw[i+1])
+                x, y, z = gen_cylinder(final_draw[i], final_draw[i+1])
                 self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
-
+                x, y, z = gen_sphere(final_draw[i+1])
+                self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
         draw, = self.ax.plot(*np.array(final_draw).T)
 
         self.ax.set_xlim3d(-10, 10)
@@ -73,39 +76,6 @@ class Arm:
         self.ax.set_zlim3d(0, 10)
         self.fig.canvas.draw_idle()
 
-    def gen_cylinder(self, p1=[2,0,6], p2=[6,0,6], r=.75):
-        resolution = 15
-        #ax = Axes3D(fig, azim=30, elev=30)
-        p1 = np.array(p1)
-        p2 = np.array(p2)
-        diff = p2-p1
-        
-        diff_xy = np.array([diff[0], diff[1]])
-
-        if diff_xy[1] < 0:
-            azimuth = -math.acos(np.inner(diff_xy/LA.norm(diff_xy), np.array([1,0])))
-        else:
-            azimuth = math.acos(np.inner(diff_xy/LA.norm(diff_xy), np.array([1,0])))
-        elevation = math.acos(np.inner(diff/LA.norm(diff), np.array([0,0,1])))
-        diff = p1-p2
-        mag = math.sqrt(diff[0]**2+diff[1]**2+diff[2]**2)
-        u = np.linspace(0, 2 * np.pi, resolution)
-        v = np.linspace(0, np.pi, resolution)
-        h = np.linspace(0,mag, resolution)
-        x = r*np.outer(np.cos(u), np.ones(np.size(v)))
-        y = r*np.outer(np.sin(u), np.ones(np.size(v)))
-        z = np.outer(np.ones(np.size(u)), h)
-        for i in range(resolution):
-            for j in range(resolution):
-                point = np.array([x[i][j], y[i][j], z[i][j]])
-                rot_matrix = rotation_matrix([0,0,1], azimuth) #This is determined by the value of the various sliders
-                rot_axis = np.dot(rot_matrix, np.array([0,1,0]))
-                rot_matrix_f = rotation_matrix(rot_axis, elevation)
-                point = np.dot(rot_matrix_f, point)
-                x[i][j] = point[0]+p1[0]
-                y[i][j] = point[1]+p1[1]
-                z[i][j] = point[2]+p1[2]
-        return x, y, z
 
     def get_arm_pos(self):
 
@@ -185,7 +155,7 @@ class Arm:
             if i < len(thickness_arr) and position_arr[i][2] < thickness_arr[i]:
                 return True
 
-        for i in range(1,len(position_arr)-1): # do joints bend too far
+        for i in range(1,len(position_arr)-1): # do joints bend too far?
             x0 = Vector(position_arr[i-1])
             x1 = Vector(position_arr[i])
             x2 = Vector(position_arr[i+1])
@@ -276,13 +246,55 @@ def rotation_matrix(axis, theta):
                      [2*(bd+ac), 2*(cd-ab), aa+dd-bb-cc]])
 
 
-arm = Arm()
-arm.add_joint([0,1,0], [0, 0, 0])
-arm.add_joint([2,0,6], [2,0,6])
-arm.add_joint([0,1,0], [6,0,6])
-arm.add_joint([0,1,0], [10,0,8])
-arm.add_joint([0,1,0], [13,0,8])
-arm.plot_arm()
+def gen_cylinder(p1=[2,0,6], p2=[6,0,6], r=.75, resolution=15):
+        #ax = Axes3D(fig, azim=30, elev=30)
+        p1 = np.array(p1)
+        p2 = np.array(p2)
+        diff = p2-p1
+        
+        diff_xy = np.array([diff[0], diff[1]])
 
-print(arm)
-plt.show()
+        if diff_xy[1] < 0:
+            azimuth = -math.acos(np.inner(diff_xy/LA.norm(diff_xy), np.array([1,0])))
+        else:
+            azimuth = math.acos(np.inner(diff_xy/LA.norm(diff_xy), np.array([1,0])))
+        elevation = math.acos(np.inner(diff/LA.norm(diff), np.array([0,0,1])))
+        diff = p1-p2
+        mag = math.sqrt(diff[0]**2+diff[1]**2+diff[2]**2)
+        u = np.linspace(0, 2 * np.pi, resolution)
+        v = np.linspace(0, np.pi, resolution)
+        h = np.linspace(0,mag, resolution)
+        x = r*np.outer(np.cos(u), np.ones(np.size(v)))
+        y = r*np.outer(np.sin(u), np.ones(np.size(v)))
+        z = np.outer(np.ones(np.size(u)), h)
+        for i in range(resolution):
+            for j in range(resolution):
+                point = np.array([x[i][j], y[i][j], z[i][j]])
+                rot_matrix = rotation_matrix([0,0,1], azimuth) # This is determined by the value of the various sliders
+                rot_axis = np.dot(rot_matrix, np.array([0,1,0]))
+                rot_matrix_f = rotation_matrix(rot_axis, elevation)
+                point = np.dot(rot_matrix_f, point)
+                x[i][j] = point[0]+p1[0]
+                y[i][j] = point[1]+p1[1]
+                z[i][j] = point[2]+p1[2]
+        print np.array([x,y,z])
+        return x, y, z
+
+
+def gen_sphere(p1, r=.75, resolution=10):
+    phi, lam = np.meshgrid(np.linspace(-math.pi/2, math.pi/2, resolution), np.linspace(0, 2*math.pi, resolution))
+    return r*np.cos(phi)*np.cos(lam)+p1[0], r*np.cos(phi)*np.sin(lam)+p1[1], r*np.sin(phi)+p1[2]
+
+
+if __name__ == "__main__":
+    arm = Arm()
+    arm.add_joint([0,1,0], [0, 0, 0])
+    arm.add_joint([2,0,6], [2,0,6])
+    arm.add_joint([0,1,0], [6,0,6])
+    arm.add_joint([0,1,0], [10,0,8])
+    arm.add_joint([0,1,0], [13,0,8])
+    arm.add_joint([1,2,3], [14,0,5])
+    arm.plot_arm()
+
+    print(arm)
+    plt.show()
