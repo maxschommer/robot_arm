@@ -179,16 +179,28 @@ class Arm:
         if thickness_arr == None:
             thickness_arr = [.75]*(len(position_arr)-1)
 
-        for i in range(0,len(position_arr)-3):
+        for i in range(2,len(position_arr)): # do segments hit the ground?
+            if position_arr[i][2] < thickness_arr[i-1]:
+                return True
+            if i < len(thickness_arr) and position_arr[i][2] < thickness_arr[i]:
+                return True
+
+        for i in range(1,len(position_arr)-1): # do joints bend too far
+            x0 = Vector(position_arr[i-1])
+            x1 = Vector(position_arr[i])
+            x2 = Vector(position_arr[i+1])
+            v,u = x0-x1, x2-x1
+            if v*u > 0:
+                return True
+
+        for i in range(0,len(position_arr)-3): # do segments hit each other?
             for j in range(i+2, len(position_arr)-1):
                 x0, x1  = Vector(position_arr[i]), Vector(position_arr[i+1])
                 if x0 == x1: # define first arm
                     break
-
                 y0, y1 = Vector(position_arr[j]), Vector(position_arr[j+1])
                 if y0 == y1: # define second arm
                     continue
-
                 if dist(x0, x1, y0, y1) <= thickness_arr[i]+thickness_arr[j]:
                     return True
 
