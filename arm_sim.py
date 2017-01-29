@@ -14,18 +14,21 @@ class Arm:
     def __init__(self, rot_axis=[0,0,1], position=[0,0,0]):
         self.rot_axis = [rot_axis]
         self.position = [position]
+        self.fig = plt.figure()
+        self.ax = self.fig.add_subplot(111, projection="3d")
+        self.lines = []
+        self.ax_joints = []
+        self.s_joints = []
+
 
     def add_joint(self, rot_axis, position):
         self.rot_axis.append(rot_axis)
         self.position.append(position)
 
-    def plot_arm(self, color='b', limits=[-10,10,-10,10,0,10], Plot=True):
-        self.fig = plt.figure()
-        self.ax = self.fig.add_subplot(111, projection="3d")
+
+    def plot_arm(self, color='b', limits=[-10,10,-10,10,0,10], Plot=True): 
         plt.subplots_adjust(bottom=(0.05*len(self.position)))
-        self.lines = []
-        self.ax_joints = []
-        self.s_joints = []
+        
 
         for i in range(len(self.position)):
 
@@ -43,7 +46,6 @@ class Arm:
                     x, y, z = self.gen_cylinder(self.position[i], self.position[i+1])
                     self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='b')
 
-        
         for i in range(len(self.position)-1):
             self.s_joints[i].on_changed(self.update)
 
@@ -132,15 +134,17 @@ class Arm:
 
         final_draw = []
         for p in range(len(pos_draw)):
-            if not np.array_equal(pos_draw[p],  np.array([None, None,None])):
+            if not np.array_equal(pos_draw[p],  np.array([None,None,None])):
                 final_draw.append(pos_draw[p])
 
         return final_draw
+
     """Work in progress"""
-    # def parameter_sweep(self, dtheta=.1, voxel_dim=100, index=0, sweep=[]):
-    #     index = len(self.s_joints)-1
-    #     points = self.recursive_layer(dtheta=dtheta, voxel_dim=voxel_dim, index=index, sweep=sweep)
-    #     #self.ax.scatter(points[])
+    def parameter_sweep(self, index=0, sweep=[]):
+
+        index = len(self.s_joints)-1
+        points = self.recursive_layer(dtheta=dtheta, voxel_dim=voxel_dim, index=index, sweep=sweep)
+        #self.ax.scatter(points[])
 
     # def recursive_layer(self, dtheta, voxel_dim, index, sweep):
     #     if index == 0:
@@ -183,6 +187,7 @@ arm.add_joint([2,0,6], [2,0,6])
 arm.add_joint([0,1,0], [6,0,6])
 arm.add_joint([0,1,0], [10,0,8])
 arm.add_joint([0,1,0], [13,0,8])
+arm.add_joint([1,2,3], [-2,-2,-4])
 arm.plot_arm()
 
 print(arm)
