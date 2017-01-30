@@ -52,7 +52,7 @@ class Arm:
                     x, y, z = gen_cylinder(self.position[i], self.position[i+1])
                     self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
                     x, y, z = gen_sphere(self.position[i+1])
-                    self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
+                    self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='k')
 
         for i in range(len(self.position)-1):
             self.s_joints[i].on_changed(self.update)
@@ -71,7 +71,7 @@ class Arm:
                 x, y, z = gen_cylinder(final_draw[i], final_draw[i+1])
                 self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
                 x, y, z = gen_sphere(final_draw[i+1])
-                self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
+                self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='k')
         draw, = self.ax.plot(*np.array(final_draw).T)
 
         self.ax.set_xlim3d(-10, 10)
@@ -120,20 +120,22 @@ class Arm:
     """Work in progress"""
     def parameter_sweep(self, index=0, iterations=10000):
         random.seed(5)
-        X=np.zeros(iterations)
-        Y=np.zeros(iterations)
-        Z=np.zeros(iterations)
+        X=[]
+        Y=[]
+        Z=[]
         for i in range(0, iterations):
             for j in range(0, len(self.s_joints)):
                 self.s_joints[j].val =  random.uniform(self.s_joints[j].valmin, self.s_joints[j].valmax)
-            point = self.get_arm_pos()[-1]
-            X[i]= point[0]
-            Y[i]= point[1]
-            Z[i]= point[2]
-        #print(X)
-        x = X
-        y = Y    
-        z = Z
+            pose = self.get_arm_pos()
+            point = pose[-1]
+            if not self.is_self_intersecting(position_arr=pose):
+	            X.append(point[0])
+	            Y.append(point[1])
+	            Z.append(point[2])
+        print(X)
+        x = np.array(X)
+        y = np.array(Y)    
+        z = np.array(Z)
 
         xyz = np.vstack([x,y,z])
         kde = stats.gaussian_kde(xyz)
@@ -309,7 +311,7 @@ def gen_cylinder(p1=[2,0,6], p2=[6,0,6], r=.75, resolution=15):
         return x, y, z
 
 
-def gen_sphere(p1, r=.75, resolution=10):
+def gen_sphere(p1, r=.75, resolution=50):
     phi, lam = np.meshgrid(np.linspace(-math.pi/2, math.pi/2, resolution), np.linspace(0, 2*math.pi, resolution))
     return r*np.cos(phi)*np.cos(lam)+p1[0], r*np.cos(phi)*np.sin(lam)+p1[1], r*np.sin(phi)+p1[2]
 
@@ -323,6 +325,6 @@ if __name__ == "__main__":
     arm.add_joint([0,1,0], [13,0,8])
     arm.add_joint([1,2,3], [14,0,5])
     arm.plot_arm()
-
+    arm.parameter_sweep()
     print(arm)
     plt.show()
