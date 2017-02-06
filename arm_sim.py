@@ -117,6 +117,13 @@ class Arm:
         return final_draw
 
 
+    def straighten(self):
+        """
+        Return an equivalent arm pointing straight up
+        """
+        pass
+
+
     """Work in progress"""
     def parameter_sweep(self, index=0, iterations=10000):
         random.seed(5)
