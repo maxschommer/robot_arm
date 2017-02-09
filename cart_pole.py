@@ -1,140 +1,100 @@
+'''
+Very basic Q-Learner that is tailored for the cart-pole environment.
+This implementation leaves a lot of space for improvements. 
+'''
+
 import gym
-import pandas as pd
-import numpy as np
+from gym import wrappers
+
+import math
 import random
+import numpy as np
 
-# https://gym.openai.com/envs/CartPole-v0
-# Carlos Aguayo - carlos.aguayo@gmail.com
+env = gym.make('CartPole-v0')
+#env = wrappers.Monitor(env, './tmp/cartpole-experiment-1')
 
+no_episodes = 100
+observation_accuracy = 1
 
-class QLearner(object):
-    def __init__(self,
-                 num_states=100,
-                 num_actions=4,
-                 alpha=0.2,
-                 gamma=0.9,
-                 random_action_rate=0.5,
-                 random_action_decay_rate=0.99):
-        self.num_states = num_states
-        self.num_actions = num_actions
-        self.alpha = alpha
-        self.gamma = gamma
-        self.random_action_rate = random_action_rate
-        self.random_action_decay_rate = random_action_decay_rate
-        self.state = 0
-        self.action = 0
-        self.qtable = np.random.uniform(low=-1, high=1, size=(num_states, num_actions))
+epsilon = 1.0
+alpha = 0.4
+Q = dict()
+available_actions = [0, 1]
 
-    def set_initial_state(self, state):
-        """
-        @summary: Sets the initial state and returns an action
-        @param state: The initial state
-        @returns: The selected action
-        """
-        self.state = state
-        self.action = self.qtable[state].argsort()[-1]
-        return self.action
+        
+def get_maxQ_action(state):
 
-    def move(self, state_prime, reward):
-        """
-        @summary: Moves to the given state with given reward and returns action
-        @param state_prime: The new state
-        @param reward: The reward
-        @returns: The selected action
-        """
-        alpha = self.alpha
-        gamma = self.gamma
-        state = self.state
-        action = self.action
-        qtable = self.qtable
+    maxQ = get_maxQ(state)
+    maxQ_actions = []
 
-        choose_random_action = (1 - self.random_action_rate) <= np.random.uniform(0, 1)
+    # add all actions with maxQ to actions-list
+    for action in Q[state].keys():
+        if Q[state][action] == maxQ:
+            maxQ_actions.append(action)
 
-        if choose_random_action:
-            action_prime = random.randint(0, self.num_actions - 1)
+    # randomly choose one of the maxQ actions
+    return maxQ_actions[random.randint(0, len(maxQ_actions) - 1)]
+    
+    
+def get_maxQ(state):
+
+    maxQ = -10000.0
+
+    for action in Q[state].keys():
+        if Q[state][action] > maxQ:
+            maxQ = Q[state][action]
+
+    return maxQ
+    
+    
+    
+for i_episode in range(no_episodes):
+    observation = env.reset()
+    
+    diff = 0.0
+    
+    epsilon = math.exp(-1.0 * alpha * i_episode)
+    
+    is_done = False
+    
+    for t in range(200):
+        env.render()
+        
+        # 1. Build State
+        state = map(lambda x: round(x,observation_accuracy), observation)
+        state_str = ' '.join([str(x) for x in state])
+        
+        # 2. Create Q entry for state
+        if not(state_str in Q):
+            Q[state_str] = dict()
+            for action in available_actions:
+                Q[state_str][action] = 0.0
+        
+        # 3. Choose action
+        if random.random() <= epsilon:
+            action = available_actions[random.randint(0, len(available_actions) - 1)]
         else:
-            action_prime = self.qtable[state_prime].argsort()[-1]
+            action = get_maxQ_action(state_str)
+        
+        # 4. do step & receive reward
+        observation, reward, done, info = env.step(action)
+                
+        # reward is always 1.0, so I'll just create my own
+        curr_diff = abs(np.sum(observation))
+        reward = diff - curr_diff
+        diff = curr_diff
 
-        self.random_action_rate *= self.random_action_decay_rate
-
-        qtable[state, action] = (1 - alpha) * qtable[state, action] + alpha * (reward + gamma * qtable[state_prime, action_prime])
-
-        self.state = state_prime
-        self.action = action_prime
-
-        return self.action
-
-
-def cart_pole_with_qlearning():
-    env = gym.make('CartPole-v0')
-    experiment_filename = './cartpole-experiment-1'
-    # gym.wrappers.Monitor.start(experiment_filename, force=True)
-
-    goal_average_steps = 195
-    max_number_of_steps = 200
-    number_of_iterations_to_average = 100
-
-    number_of_features = env.observation_space.shape[0]
-    last_time_steps = np.ndarray(0)
-
-    cart_position_bins = pd.cut([-2.4, 2.4], bins=10, retbins=True)[1][1:-1]
-    pole_angle_bins = pd.cut([-2, 2], bins=10, retbins=True)[1][1:-1]
-    cart_velocity_bins = pd.cut([-1, 1], bins=10, retbins=True)[1][1:-1]
-    angle_rate_bins = pd.cut([-3.5, 3.5], bins=10, retbins=True)[1][1:-1]
-
-    def build_state(features):
-        return int("".join(map(lambda feature: str(int(feature)), features)))
-
-    def to_bin(value, bins):
-        return np.digitize(x=[value], bins=bins)[0]
-
-    learner = QLearner(num_states=10 ** number_of_features,
-                       num_actions=env.action_space.n,
-                       alpha=0.2,
-                       gamma=1,
-                       random_action_rate=0.5,
-                       random_action_decay_rate=0.99)
-
-    for episode in xrange(50000):
-        observation = env.reset()
-        cart_position, pole_angle, cart_velocity, angle_rate_of_change = observation
-        state = build_state([to_bin(cart_position, cart_position_bins),
-                             to_bin(pole_angle, pole_angle_bins),
-                             to_bin(cart_velocity, cart_velocity_bins),
-                             to_bin(angle_rate_of_change, angle_rate_bins)])
-        action = learner.set_initial_state(state)
-
-        for step in xrange(max_number_of_steps - 1):
-            observation, reward, done, info = env.step(action)
-
-            cart_position, pole_angle, cart_velocity, angle_rate_of_change = observation
-
-            state_prime = build_state([to_bin(cart_position, cart_position_bins),
-                                       to_bin(pole_angle, pole_angle_bins),
-                                       to_bin(cart_velocity, cart_velocity_bins),
-                                       to_bin(angle_rate_of_change, angle_rate_bins)])
-
-            if done:
-                reward = -200
-
-            action = learner.move(state_prime, reward)
-            env.render()
-            if done:
-                last_time_steps = np.append(last_time_steps, [int(step + 1)])
-                if len(last_time_steps) > number_of_iterations_to_average:
-                    last_time_steps = np.delete(last_time_steps, 0)
-                break
-
-        if last_time_steps.mean() > goal_average_steps:
-            print "Goal reached!"
-            print "Episodes before solve: ", episode + 1
-            print u"Best 100-episode performance {} {} {}".format(last_time_steps.max(),
-                                                                  unichr(177),  # plus minus sign
-                                                                  last_time_steps.std())
+        # 5. learn
+        Q[state_str][action] += (alpha * (reward - Q[state_str][action]))
+        
+        # 6. Check if done with this episode
+        if done:
+            print("Episode {} finished after {} timesteps".format(i_episode + 1, t+1))
+            is_done = True
             break
-
-    # env.monitor.close()
-
-if __name__ == "__main__":
-    random.seed(0)
-    cart_pole_with_qlearning()
+    
+    if is_done == False:
+        print("Episode {} COMPLETED".format(i_episode + 1))
+        
+        
+env.close()
