@@ -1,100 +1,30 @@
-'''
-Very basic Q-Learner that is tailored for the cart-pole environment.
-This implementation leaves a lot of space for improvements. 
-'''
+from agent import Agent
+from environment import Environment
+from model import Model
 
-import gym
-from gym import wrappers
+model = Model(batch_size=128, lr=1e-2, load=None)
+env = Environment(env_type=Environment.TYPE_CART_POLE, render=True, monitor=False)
+agent = Agent(env=env, model=model)
 
-import math
-import random
-import numpy as np
+episode = 0
+first_reward = 0
+while True:
+    episode += 1
+    reward = agent.learn(overfit=False)
 
-env = gym.make('CartPole-v0')
-#env = wrappers.Monitor(env, './tmp/cartpole-experiment-1')
+    if first_reward == 0:
+        first_reward = reward
 
-no_episodes = 100
-observation_accuracy = 1
+    print "Reward delta: %d"%(reward - first_reward)
 
-epsilon = 1.0
-alpha = 0.4
-Q = dict()
-available_actions = [0, 1]
+    if reward >= 200:
+        print "SOLVED after %d episodes!"%(episode)
+        p = 0
+        while reward > 150:
+            p += 1
+            reward = agent.play()
+            print reward
 
-        
-def get_maxQ_action(state):
-
-    maxQ = get_maxQ(state)
-    maxQ_actions = []
-
-    # add all actions with maxQ to actions-list
-    for action in Q[state].keys():
-        if Q[state][action] == maxQ:
-            maxQ_actions.append(action)
-
-    # randomly choose one of the maxQ actions
-    return maxQ_actions[random.randint(0, len(maxQ_actions) - 1)]
-    
-    
-def get_maxQ(state):
-
-    maxQ = -10000.0
-
-    for action in Q[state].keys():
-        if Q[state][action] > maxQ:
-            maxQ = Q[state][action]
-
-    return maxQ
-    
-    
-    
-for i_episode in range(no_episodes):
-    observation = env.reset()
-    
-    diff = 0.0
-    
-    epsilon = math.exp(-1.0 * alpha * i_episode)
-    
-    is_done = False
-    
-    for t in range(200):
-        env.render()
-        
-        # 1. Build State
-        state = map(lambda x: round(x,observation_accuracy), observation)
-        state_str = ' '.join([str(x) for x in state])
-        
-        # 2. Create Q entry for state
-        if not(state_str in Q):
-            Q[state_str] = dict()
-            for action in available_actions:
-                Q[state_str][action] = 0.0
-        
-        # 3. Choose action
-        if random.random() <= epsilon:
-            action = available_actions[random.randint(0, len(available_actions) - 1)]
-        else:
-            action = get_maxQ_action(state_str)
-        
-        # 4. do step & receive reward
-        observation, reward, done, info = env.step(action)
-                
-        # reward is always 1.0, so I'll just create my own
-        curr_diff = abs(np.sum(observation))
-        reward = diff - curr_diff
-        diff = curr_diff
-
-        # 5. learn
-        Q[state_str][action] += (alpha * (reward - Q[state_str][action]))
-        
-        # 6. Check if done with this episode
-        if done:
-            print("Episode {} finished after {} timesteps".format(i_episode + 1, t+1))
-            is_done = True
-            break
-    
-    if is_done == False:
-        print("Episode {} COMPLETED".format(i_episode + 1))
-        
-        
-env.close()
+            if p > 120:
+                env.close()
+                exit()
