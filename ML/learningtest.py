@@ -15,16 +15,15 @@ gamma = 0.7
 env = gym.make('CartPole-v0')
 
 from keras.models import Sequential
-from keras.layers import Convolution2D, Activation, Flatten, Dense
-from keras.optimizers import sgd
-nb_frames=1
-grid_size=10
-hidden_size=100
+from keras.layers import Dense
+from keras.optimizers import RMSprop
 model = Sequential()
-model.add(Dense(hidden_size, activation='relu', input_dim=4))
-model.add(Dense(hidden_size, activation='relu'))
-model.add(Dense(2))
-model.compile(sgd(lr=.2), "mse")
+model.add(Dense(64, input_dim=4, activation='tanh', init='he_uniform'))
+model.add(Dense(128, activation='tanh', init='he_uniform'))
+model.add(Dense(128, activation='tanh', init='he_uniform'))
+model.add(Dense(2, activation='linear', init='he_uniform'))
+model.compile(loss='mse',
+              optimizer=RMSprop(lr=0.0001))
 
 
 network = model
