@@ -63,7 +63,7 @@ class DQNAgent:
             state, action, reward, next_state = self.memory[i]
             target = reward + self.gamma * \
                         np.amax(self.model.predict(next_state)[0])
-            target_f = self.model.predict(state)
+            target_f = np.zeros((1,self.env.action_space.n))
             target_f[0][action] = target
             self.model.fit(state, target_f, nb_epoch=1, verbose=0)
         if self.epsilon > self.epsilon_min:
