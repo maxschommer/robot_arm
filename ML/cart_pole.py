@@ -19,8 +19,8 @@ class DQNAgent:
         self.gamma = 0.9  # decay rate
         self.epsilon = 0.7  # exploration
         self.epsilon_decay = .99
-        self.epsilon_min = 0.05
-        self.learning_rate = 0.0001
+        self.epsilon_min = 0.005
+        self.learning_rate = 0.0003
         self._build_model()
 
 
