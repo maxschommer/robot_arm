@@ -10,7 +10,7 @@ from keras.optimizers import RMSprop
 
 
 class DQNAgent:
-	def __init__(self, env, mem_size=1000, gamma=0.9, epsilon=0.7, epsilon_decay=0.99, epsilon_min=0.005, learning_rate=0.0003, batch_size=32):
+	def __init__(self, env, mem_size=10000, gamma=0.9, epsilon=0.7, epsilon_decay=0.99, epsilon_min=0.005, learning_rate=0.0005, batch_size=32):
 		"""Assign default values to various variables"""
 		self.env = env
 		self.memory = deque(maxlen=mem_size)
@@ -62,7 +62,7 @@ class DQNAgent:
 			state, action, reward, next_state = self.memory[i]
 			target = reward + self.gamma * \
 						np.amax(self.model.predict(next_state)[0])
-			target_f = np.ones((1,self.env.action_space.n))
+			target_f = np.zeros((1,self.env.action_space.n))
 			target_f[0][action] = target
 			self.model.fit(state, target_f, nb_epoch=1, verbose=0)
 		if self.epsilon > self.epsilon_min:
@@ -91,10 +91,11 @@ class DQNAgent:
 				action = self.act(state) #choose action
 				next_state, reward, done, _ = self.env.step(action) # do that action
 				next_state = np.reshape(next_state, [1, 4])
-				reward = -10 if done else reward
+				reward = -10 if done else 1-4*abs(state[0,2])
 				self.remember(state, action, reward, next_state) # save the result for later analysis
 				state = copy.deepcopy(next_state)
-				if done: break
+				if done:
+					break
 
 			if verbose:
 				print("episode: {}/{}, score: {}, memory size: {}, e: {}"
