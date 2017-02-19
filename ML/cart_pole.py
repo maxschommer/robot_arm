@@ -128,4 +128,4 @@ if __name__ == "__main__":
 	print(agent)
 	#agent.load("./save/cartpole-starter.h5")
 	score = agent.train(verbose=True)
-	print("Final score: "+score)
+	print("Final score:",score)
