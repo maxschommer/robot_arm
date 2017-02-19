@@ -10,7 +10,7 @@ from keras.optimizers import RMSprop
 
 
 class DQNAgent:
-	def __init__(self, env, mem_size=10000, gamma=0.9, epsilon=0.7, epsilon_decay=0.99, epsilon_min=0.005, learning_rate=0.0003, batch_size=32):
+	def __init__(self, env, mem_size=1000, gamma=0.9, epsilon=0.7, epsilon_decay=0.99, epsilon_min=0.005, learning_rate=0.0003, batch_size=32):
 		"""Assign default values to various variables"""
 		self.env = env
 		self.memory = deque(maxlen=mem_size)
@@ -29,9 +29,9 @@ class DQNAgent:
 		N_OUT = self.env.action_space.n
 
 		model = Sequential()
-		model.add(Dense(64, input_dim=N_IN, activation='tanh', init='he_uniform'))
-		model.add(Dense(128, activation='tanh', init='he_uniform'))
-		model.add(Dense(128, activation='tanh', init='he_uniform'))
+		model.add(Dense(16, input_dim=N_IN, activation='tanh', init='he_uniform'))
+		model.add(Dense(8, activation='tanh', init='he_uniform'))
+		model.add(Dense(4, activation='tanh', init='he_uniform'))
 		model.add(Dense(N_OUT, activation='linear', init='he_uniform'))
 
 		model.compile(loss='mse',
@@ -79,7 +79,7 @@ class DQNAgent:
 		self.model.save_weights(name)
 
 
-	def train(self, episodes=1000, verbose=False):
+	def train(self, episodes=300, verbose=False):
 		"""do the machine learning thing"""
 		scores = []
 		for e in range(episodes):
@@ -91,7 +91,7 @@ class DQNAgent:
 				action = self.act(state) #choose action
 				next_state, reward, done, _ = self.env.step(action) # do that action
 				next_state = np.reshape(next_state, [1, 4])
-				reward = -100 if done else reward
+				reward = -10 if done else reward
 				self.remember(state, action, reward, next_state) # save the result for later analysis
 				state = copy.deepcopy(next_state)
 				if done: break
