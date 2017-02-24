@@ -136,18 +136,33 @@ class Arm:
 
 	def move_to(self, final_position, step=1):
 		"""
-		Move to the new position.
+		Move to the new position. Return 0 for success and 1 for failure
 		"""
+		if self.is_self_intersecting():
+			print("ERR: I am dead.")
+			return 0
+
 		current_position = np.array(self.get_arm_pos()[-1])
 		tot_dist = np.linalg.norm(final_position-current_position)
 		tot_steps = int(tot_dist/step)
 		for i in range(tot_steps):
 			DF = self.jacobian()
-			current_position = np.array(self.get_arm_pos()[-1])
-			current_step = (final_position-current_position)/(tot_steps-i)
-			commands = np.dot(np.linalg.pinv(DF),current_step)
-			for j, command in enumerate(commands):
-				self.s_joints[j].val += command
+			while True:
+				if not DF.any():
+					print("ERR: I am stuck")
+					return 0
+				current_position = np.array(self.get_arm_pos()[-1])
+				current_step = (final_position-current_position)/(tot_steps-i)
+				commands = np.dot(np.linalg.pinv(DF),current_step)
+				for j, command in enumerate(commands):
+					self.s_joints[j].val += command
+					if self.is_self_intersecting():
+						self.s_joints[j].val -= command
+						DF[:,j] = 0
+						break
+
+				break
+		return 1
 
 
 	def straighten(self):
@@ -367,5 +382,5 @@ if __name__ == "__main__":
 	arm.add_joint([1,2,3], [14,0,5])
 	arm.plot_arm()
 	#arm.parameter_sweep()
-	arm.move_to([1,2,3])
+	arm.move_to([3,10,3])
 	plt.show()
