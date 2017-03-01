@@ -81,7 +81,9 @@ class Arm:
 
 
 	def get_arm_pos(self):
-
+		"""
+		Returns a list. Not a numpy array, contrary to what Schommer will tell you
+		"""
 		pos_draw = np.array(self.position)
 		pos_draw = pos_draw.astype(float)
 		rot_axis_draw = np.array(self.rot_axis)
@@ -117,6 +119,52 @@ class Arm:
 		return final_draw
 
 
+	def jacobian(self, delta=0.01):
+		"""
+		Make a totally real and exactly calculated with lots of algebra and trig jacobian matrix
+		"""
+		matrix = np.zeros((3, len(self.s_joints)))
+		position0 = np.array(self.get_arm_pos()[-1])
+		for i, s in enumerate(self.s_joints):
+			s.val += delta
+			position1 = np.array(self.get_arm_pos()[-1])
+			matrix[:,i] = (position1-position0)/delta
+			s.val -= delta
+
+		return matrix
+
+
+	def move_to(self, final_position, step=1):
+		"""
+		Move to the new position. Return 0 for success and 1 for failure
+		"""
+		if self.is_self_intersecting():
+			print("ERR: I am dead.")
+			return 0
+
+		current_position = np.array(self.get_arm_pos()[-1])
+		tot_dist = np.linalg.norm(final_position-current_position)
+		tot_steps = int(tot_dist/step)
+		for i in range(tot_steps):
+			DF = self.jacobian()
+			while True:
+				if not DF.any():
+					print("ERR: I am stuck")
+					return 0
+				current_position = np.array(self.get_arm_pos()[-1])
+				current_step = (final_position-current_position)/(tot_steps-i)
+				commands = np.dot(np.linalg.pinv(DF),current_step)
+				for j, command in enumerate(commands):
+					self.s_joints[j].val += command
+					if self.is_self_intersecting():
+						self.s_joints[j].val -= command
+						DF[:,j] = 0
+						break
+
+				break
+		return 1
+
+
 	def straighten(self):
 		"""
 		Return an equivalent arm pointing straight up
@@ -132,7 +180,7 @@ class Arm:
 		Z=[]
 		for i in range(0, iterations):
 			for j in range(0, len(self.s_joints)):
-				self.s_joints[j].val =  random.uniform(self.s_joints[j].valmin, self.s_joints[j].valmax)
+				self.s_joints[j].val = random.uniform(self.s_joints[j].valmin, self.s_joints[j].valmax)
 			pose = self.get_arm_pos()
 			point = pose[-1]
 			if not self.is_self_intersecting(position_arr=pose):
@@ -333,6 +381,6 @@ if __name__ == "__main__":
 	arm.add_joint([0,1,0], [13,0,8])
 	arm.add_joint([1,2,3], [14,0,5])
 	arm.plot_arm()
-	arm.parameter_sweep()
-	print(arm)
+	#arm.parameter_sweep()
+	arm.move_to([3,10,3])
 	plt.show()
