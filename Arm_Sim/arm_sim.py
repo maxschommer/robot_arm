@@ -28,27 +28,31 @@ class Arm:
 		self.lines = [] # idk some lines or something
 		self.ax_joints = [] # all of the angles
 		self.s_joints = [] # the matplotlib sliders that control it
+		self.limits = [] # the min angles
 		self.history = [] # the points to which it has been
 
 
 
-	def add_joint(self, rot_axis, position):
+	def compile(self):
+		""" Initialises things to the point that you can plot them """
+		for i in range(len(self.rest_position)):
+			if self.rest_position[i] != [None,None,None]:
+				self.lines.insert(0, self.rest_position[i])
+			if i != len(self.rest_position)-1:
+				self.ax_joints.append(plt.axes([.25, i/20.+.02, 0.65, 0.03], axisbg="w"))
+				self.s_joints.append(Slider(self.ax_joints[i], "Base Rotation", -3.14159, 3.14159, valinit=0))
+
+
+	def add_joint(self, rot_axis, position, max_angle=math.pi/2):
 		self.rot_axis.append(rot_axis)
 		self.rest_position.append(position)
+		self.limits.append(max_angle)
 
 
-	def plot_arm(self, limits=[-10,10,-10,10,0,10], static_plot=True, init=True):
+	def plot_arm(self, limits=[-10,10,-10,10,0,10], static_plot=True):
 		color = 'r' if self.is_self_intersecting(self.rest_position) else 'b'
 
 		plt.subplots_adjust(bottom=(0.05*len(self.rest_position)))
-		if init == True:
-			for i in range(len(self.rest_position)):
-
-				if self.rest_position[i] != [None,None,None]:
-					self.lines.insert(0, self.rest_position[i])
-				if i != len(self.rest_position)-1:
-					self.ax_joints.append(plt.axes([.25, i/20.+.02, 0.65, 0.03], axisbg="w"))
-					self.s_joints.append(Slider(self.ax_joints[i], "Base Rotation", -3.14159, 3.14159, valinit=0))
 
 		if static_plot == True:
 			#self.ax.plot(*np.array(self.lines).T)
@@ -186,7 +190,7 @@ class Arm:
 				c = np.zeros(len(self.rest_position)-1)
 				for k in xrange(0,len(self.rest_position)-1):
 					if k > 0 and not np.isnan(angles[k-1]):
-						c[k] = np.dot(DF[:,k], del_r)*math.cos(angles[k-1])
+						c[k] = np.dot(DF[:,k], del_r)*(self.limits[k]-angles[k-1])
 					else:
 						c[k] = np.dot(DF[:,k], del_r)
 
@@ -202,7 +206,7 @@ class Arm:
 
 			self.history.append(self.get_arm_pos())
 			self.ax.cla()
-			self.plot_arm(init=False, static_plot=False)
+			self.plot_arm(static_plot=False)
    			plt.pause(step_size/20)
 
 
@@ -273,6 +277,7 @@ class Arm:
 		"""
 		if position_arr == None:
 			position_arr = self.get_arm_pos()
+		position_arr = np.array(position_arr)
 		if thickness_arr == None:
 			thickness_arr = [.75]*(len(position_arr)-1)
 
@@ -283,11 +288,11 @@ class Arm:
 				return True
 
 		for i in range(1,len(position_arr)-1): # do joints bend too far?
-			x0 = Vector(position_arr[i-1])
-			x1 = Vector(position_arr[i])
-			x2 = Vector(position_arr[i+1])
+			x0 = position_arr[i-1]
+			x1 = position_arr[i]
+			x2 = position_arr[i+1]
 			v,u = x0-x1, x2-x1
-			if v*u > 0:
+			if calc_angle(x0,x1,x2) > self.limits[i]:
 				return True
 
 		for i in range(0,len(position_arr)-3): # do segments hit each other?
@@ -428,11 +433,12 @@ if __name__ == "__main__":
 	arm.add_joint([0,1,0], [0, 0, 0])
 	arm.add_joint([0,1,0], [2,0,6])
 	arm.add_joint([0,1,0], [6,0,6])
-	arm.add_joint([0,1,0], [10,0,8])
+	arm.add_joint([0,1,0], [10,0,8],0.5)
 	arm.add_joint([0,1,0], [13,0,8])
 	arm.add_joint([1,2,3], [14,0,5])
+	arm.compile()
 	arm.plot_arm(static_plot=False)
 	#arm.parameter_sweep()
-	arm.move_to([2,2,2])
+	arm.move_to([3,3,3])
 
 	plt.show()
