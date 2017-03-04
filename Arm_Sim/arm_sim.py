@@ -4,8 +4,10 @@ from mpl_toolkits.mplot3d import Axes3D
 from matplotlib.widgets import Slider, Button, RadioButtons
 from numpy import linalg as LA
 import mpl_toolkits.mplot3d.art3d as art3d
+import matplotlib.animation as animation
 import math
 import random
+import time
 import seaborn as sns
 from scipy import stats
 from mayavi import mlab
@@ -18,7 +20,7 @@ class Arm:
 
 	def __init__(self, rot_axis=[0,0,1], position=[0,0,0]):
 		self.rot_axis = [rot_axis]
-		self.position = [position]
+		self.rest_position = [position]
 		self.fig = plt.figure()
 		self.ax = self.fig.add_subplot(111, projection="3d")
 		self.lines = []
@@ -26,35 +28,46 @@ class Arm:
 		self.s_joints = []
 
 
+
 	def add_joint(self, rot_axis, position):
 		self.rot_axis.append(rot_axis)
-		self.position.append(position)
+		self.rest_position.append(position)
 
 
-	def plot_arm(self, limits=[-10,10,-10,10,0,10], Plot=True):
-		color = 'r' if self.is_self_intersecting(self.position) else 'b'
+	def plot_arm(self, limits=[-10,10,-10,10,0,10], static_plot=True, init=True):
+		color = 'r' if self.is_self_intersecting(self.rest_position) else 'b'
 
-		plt.subplots_adjust(bottom=(0.05*len(self.position)))
+		plt.subplots_adjust(bottom=(0.05*len(self.rest_position)))
+		if init == True:
+			for i in range(len(self.rest_position)):
 
-		for i in range(len(self.position)):
+				if self.rest_position[i] != [None,None,None]:
+					self.lines.insert(0, self.rest_position[i])
+				if i != len(self.rest_position)-1:
+					self.ax_joints.append(plt.axes([.25, i/20.+.02, 0.65, 0.03], axisbg="w"))
+					self.s_joints.append(Slider(self.ax_joints[i], "Base Rotation", -3.14159, 3.14159, valinit=0))
 
-			if self.position[i] != [None,None,None]:
-				self.lines.insert(0, self.position[i])
-			if i != len(self.position)-1:
-				self.ax_joints.append(plt.axes([.25, i/20.+.02, 0.65, 0.03], axisbg="w"))
-				self.s_joints.append(Slider(self.ax_joints[i], "Base Rotation", -3.14159, 3.14159, valinit=0))
-
-		if Plot:
+		if static_plot == True:
 			self.lines_plot, = self.ax.plot(*np.array(self.lines).T)
 	   
-			for i in range(len(self.position)-1):
-				if not np.array_equal(self.position[i],  self.position[i+1]):
-					x, y, z = gen_cylinder(self.position[i], self.position[i+1])
+			for i in range(len(self.rest_position)-1):
+				if not np.array_equal(self.rest_position[i],  self.rest_position[i+1]):
+					x, y, z = gen_cylinder(self.rest_position[i], self.rest_position[i+1])
 					self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
-					x, y, z = gen_sphere(self.position[i+1])
+					x, y, z = gen_sphere(self.rest_position[i+1])
 					self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='k')
 
-		for i in range(len(self.position)-1):
+		else:
+			self.lines_plot, = self.ax.plot(*np.array(self.lines).T)
+	   		current_position = self.get_arm_pos()
+			for i in range(len(current_position)-1):
+				if not np.array_equal(current_position[i],  current_position[i+1]):
+					x, y, z = gen_cylinder(current_position[i], current_position[i+1])
+					self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color=color)
+					x, y, z = gen_sphere(current_position[i+1])
+					self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='k')
+
+		for i in range(len(self.rest_position)-1):
 			self.s_joints[i].on_changed(self.update)
 
 		self.ax.set_xlim3d(-10, 10)
@@ -84,7 +97,7 @@ class Arm:
 		"""
 		Returns a list. Not a numpy array, contrary to what Schommer will tell you
 		"""
-		pos_draw = np.array(self.position)
+		pos_draw = np.array(self.rest_position)
 		pos_draw = pos_draw.astype(float)
 		rot_axis_draw = np.array(self.rot_axis)
 		rot_axis_draw = rot_axis_draw.astype(float)
@@ -119,7 +132,7 @@ class Arm:
 		return final_draw
 
 
-	def jacobian(self, delta=0.01):
+	def jacobian(self, delta=0.001):
 		"""
 		Make a totally real and exactly calculated with lots of algebra and trig jacobian matrix
 		"""
@@ -134,34 +147,63 @@ class Arm:
 		return matrix
 
 
-	def move_to(self, final_position, step=1):
+
+
+
+	def move_to(self, final_position, step_size=0.5):
 		"""
 		Move to the new position. Return 0 for success and 1 for failure
 		"""
 		if self.is_self_intersecting():
 			print("ERR: I am dead.")
 			return 0
+		
+
 
 		current_position = np.array(self.get_arm_pos()[-1])
+
 		tot_dist = np.linalg.norm(final_position-current_position)
-		tot_steps = int(tot_dist/step)
+		tot_steps = int(tot_dist/step_size)
 		for i in range(tot_steps):
 			DF = self.jacobian()
 			while True:
 				if not DF.any():
 					print("ERR: I am stuck")
 					return 0
+				pos_mat = self.get_arm_pos()
+				abs_angle = np.zeros(len(pos_mat)-1)
+				for m in xrange(0,len(pos_mat)-2):
+					abs_angle[m] = np.dot(pos_mat[m]-pos_mat[m+1], pos_mat[m+1]-pos_mat[m+2])/(np.linalg.norm(pos_mat[m]-pos_mat[m+1])*np.linalg.norm(pos_mat[m+1]-pos_mat[m+2]))
+					#if abs_angle[m] < 1:
+				print(abs_angle)
+				#print('end')
 				current_position = np.array(self.get_arm_pos()[-1])
-				current_step = (final_position-current_position)/(tot_steps-i)
-				commands = np.dot(np.linalg.pinv(DF),current_step)
+				del_r = (final_position-current_position)/(tot_steps-i)
+				c = np.zeros(len(self.rest_position)-1)
+				for k in xrange(0,len(self.rest_position)-1):
+					if abs_angle[k] < 1 and k > 0 and np.isnan(abs_angle[k-1]) != True:
+						c[k] = np.dot(DF[:,k], del_r)*abs_angle[k-1]
+					else:
+						c[k] = np.dot(DF[:,k], del_r)
+
+				print(c)
+				p = np.linalg.norm(del_r)/np.linalg.norm(np.sum(c*DF,axis=1))
+				commands = p*c
+				# commands = np.dot(np.linalg.pinv(DF),del_r)
 				for j, command in enumerate(commands):
 					self.s_joints[j].val += command
-					if self.is_self_intersecting():
-						self.s_joints[j].val -= command
-						DF[:,j] = -DF[:,j]
-						break
-
+					# if self.is_self_intersecting():
+					# 	self.s_joints[j].val -= command
+					# 	DF[:,j] = 0
+					# 	break
 				break
+
+			self.ax.cla()
+			self.rest_positionani = self.get_arm_pos()
+			self.plot_arm(init=False, static_plot=False)
+   			plt.pause(step_size/20)
+
+
 		return 1
 
 
@@ -218,7 +260,7 @@ class Arm:
 
    
 	def __str__(self):
-		pos_str = str(self.position)
+		pos_str = str(self.rest_position)
 		rot_str = str(self.rot_axis)
 		output = 'Position Array: ' + pos_str +'\n'+'Rotation Axis Array: ' + rot_str
 		return output
@@ -265,7 +307,7 @@ def dist(x0, x1, y0, y1):
 	"""
 	Distance between line segments x0->x1 and y0->y1
 	"""
-	SMALL_NUM = 0.01
+	SMALL_NUM = 0.01 #This is a really small number
 	u = x1 - x0
 	v = y1 - y0
 	w = x0 - y0
@@ -380,7 +422,8 @@ if __name__ == "__main__":
 	arm.add_joint([0,1,0], [10,0,8])
 	arm.add_joint([0,1,0], [13,0,8])
 	arm.add_joint([1,2,3], [14,0,5])
-	arm.plot_arm()
+	arm.plot_arm(static_plot=False)
 	#arm.parameter_sweep()
-	arm.move_to([3,10,3])
+	arm.move_to([0,0,0])
+
 	plt.show()
