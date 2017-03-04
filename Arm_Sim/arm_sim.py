@@ -158,7 +158,7 @@ class Arm:
 					self.s_joints[j].val += command
 					if self.is_self_intersecting():
 						self.s_joints[j].val -= command
-						DF[:,j] = 0
+						DF[:,j] = -DF[:,j]
 						break
 
 				break
