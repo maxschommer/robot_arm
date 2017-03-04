@@ -12,6 +12,8 @@ import seaborn as sns
 from scipy import stats
 from mayavi import mlab
 import multiprocessing
+
+import dumbmatplotlibworkarounds
 from vector import Vector
 
 
@@ -19,13 +21,14 @@ class Arm:
 	"""This holds all of the positions of all of the joints, and the axis of roation of all of the segments""" 
 
 	def __init__(self, rot_axis=[0,0,1], position=[0,0,0]):
-		self.rot_axis = [rot_axis]
-		self.rest_position = [position]
-		self.fig = plt.figure()
-		self.ax = self.fig.add_subplot(111, projection="3d")
-		self.lines = []
-		self.ax_joints = []
-		self.s_joints = []
+		self.rot_axis = [rot_axis] # ?
+		self.rest_position = [position] # the initial position
+		self.fig = plt.figure(figsize=plt.figaspect(1.5)*2) # the figure that displays everything
+		self.ax = self.fig.add_subplot(111, projection="3d") # the axes that display everything
+		self.lines = [] # idk some lines or something
+		self.ax_joints = [] # all of the angles
+		self.s_joints = [] # the matplotlib sliders that control it
+		self.history = [] # the points to which it has been
 
 
 
@@ -48,8 +51,8 @@ class Arm:
 					self.s_joints.append(Slider(self.ax_joints[i], "Base Rotation", -3.14159, 3.14159, valinit=0))
 
 		if static_plot == True:
-			self.lines_plot, = self.ax.plot(*np.array(self.lines).T)
-	   
+			#self.ax.plot(*np.array(self.lines).T)
+	
 			for i in range(len(self.rest_position)-1):
 				if not np.array_equal(self.rest_position[i],  self.rest_position[i+1]):
 					x, y, z = gen_cylinder(self.rest_position[i], self.rest_position[i+1])
@@ -58,7 +61,11 @@ class Arm:
 					self.ax.plot_surface(x, y, z, rstride=4, cstride=4, color='k')
 
 		else:
-			self.lines_plot, = self.ax.plot(*np.array(self.lines).T)
+			if len(self.history) > 0:
+				for i in range(len(self.rest_position)):
+					self.ax.plot(*np.array(self.history)[:,i,:].T)
+
+			#self.ax.plot(*np.array(self.lines).T)
 	   		current_position = self.get_arm_pos()
 			for i in range(len(current_position)-1):
 				if not np.array_equal(current_position[i],  current_position[i+1]):
@@ -72,8 +79,8 @@ class Arm:
 
 		self.ax.set_xlim3d(-10, 10)
 		self.ax.set_ylim3d(-10, 10)
-		self.ax.set_zlim3d(0, 10)
-
+		self.ax.set_zlim3d(0, 20)
+		self.ax.grid(b=False)
 
 	def update(self, val):
 		final_draw = self.get_arm_pos()
@@ -90,6 +97,7 @@ class Arm:
 		self.ax.set_xlim3d(-10, 10)
 		self.ax.set_ylim3d(-10, 10)
 		self.ax.set_zlim3d(0, 10)
+		self.ax.axis('square')
 		self.fig.canvas.draw_idle()
 
 
@@ -158,9 +166,8 @@ class Arm:
 			print("ERR: I am dead.")
 			return 0
 		
-
-
-		current_position = np.array(self.get_arm_pos()[-1])
+		self.history.append(self.get_arm_pos())
+		current_position = np.array(self.history[-1][-1])
 
 		tot_dist = np.linalg.norm(final_position-current_position)
 		tot_steps = int(tot_dist/step_size)
@@ -174,38 +181,33 @@ class Arm:
 				abs_angle = np.zeros(len(pos_mat)-1)
 				for m in xrange(0,len(pos_mat)-2):
 					abs_angle[m] = np.dot(pos_mat[m]-pos_mat[m+1], pos_mat[m+1]-pos_mat[m+2])/(np.linalg.norm(pos_mat[m]-pos_mat[m+1])*np.linalg.norm(pos_mat[m+1]-pos_mat[m+2]))
-					#if abs_angle[m] < 1:
-				print(abs_angle)
-				#print('end')
 				current_position = np.array(self.get_arm_pos()[-1])
 				del_r = (final_position-current_position)/(tot_steps-i)
 				c = np.zeros(len(self.rest_position)-1)
 				for k in xrange(0,len(self.rest_position)-1):
-					if abs_angle[k] < 1 and k > 0 and np.isnan(abs_angle[k-1]) != True:
+					if k > 0 and np.isnan(abs_angle[k-1]) != True:
 						c[k] = np.dot(DF[:,k], del_r)*abs_angle[k-1]
 					else:
 						c[k] = np.dot(DF[:,k], del_r)
 
-				print(c)
 				p = np.linalg.norm(del_r)/np.linalg.norm(np.sum(c*DF,axis=1))
 				commands = p*c
 				# commands = np.dot(np.linalg.pinv(DF),del_r)
 				for j, command in enumerate(commands):
 					self.s_joints[j].val += command
-					# if self.is_self_intersecting():
-					# 	self.s_joints[j].val -= command
-					# 	DF[:,j] = 0
-					# 	break
+					if self.is_self_intersecting():
+						self.s_joints[j].val -= command
+						DF[:,j] = 0
+						break
 				break
 
+			self.history.append(self.get_arm_pos())
 			self.ax.cla()
-			self.rest_positionani = self.get_arm_pos()
 			self.plot_arm(init=False, static_plot=False)
    			plt.pause(step_size/20)
 
 
 		return 1
-
 
 	def straighten(self):
 		"""
@@ -424,6 +426,6 @@ if __name__ == "__main__":
 	arm.add_joint([1,2,3], [14,0,5])
 	arm.plot_arm(static_plot=False)
 	#arm.parameter_sweep()
-	arm.move_to([0,0,0])
+	arm.move_to([2,2,2])
 
 	plt.show()
