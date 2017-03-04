@@ -157,8 +157,11 @@ class Arm:
 		if self.is_self_intersecting():
 			print("ERR: I am dead.")
 			return 0
+		
+
 
 		current_position = np.array(self.get_arm_pos()[-1])
+
 		tot_dist = np.linalg.norm(final_position-current_position)
 		tot_steps = int(tot_dist/step_size)
 		for i in range(tot_steps):
@@ -167,17 +170,29 @@ class Arm:
 				if not DF.any():
 					print("ERR: I am stuck")
 					return 0
+				pos_mat = self.get_arm_pos()
+				abs_angle = np.zeros(len(pos_mat)-1)
+				for m in xrange(0,len(pos_mat)-2):
+					abs_angle[m] = np.dot(pos_mat[m]-pos_mat[m+1], pos_mat[m+1]-pos_mat[m+2])/(np.linalg.norm(pos_mat[m]-pos_mat[m+1])*np.linalg.norm(pos_mat[m+1]-pos_mat[m+2]))
+					#if abs_angle[m] < 1:
+				print(abs_angle)
+				#print('end')
 				current_position = np.array(self.get_arm_pos()[-1])
 				del_r = (final_position-current_position)/(tot_steps-i)
 				c = np.zeros(len(self.rest_position)-1)
 				for k in xrange(0,len(self.rest_position)-1):
-					c[k] = np.dot(DF[:,k], del_r)
-				print(c*DF)
-				k = np.linalg.norm(del_r)/np.linalg.norm(np.sum(c*DF,axis=1))
-				commands = k*c
+					if abs_angle[k] < 1 and k > 0 and np.isnan(abs_angle[k-1]) != True:
+						c[k] = np.dot(DF[:,k], del_r)*abs_angle[k-1]
+					else:
+						c[k] = np.dot(DF[:,k], del_r)
+
+				print(c)
+				p = np.linalg.norm(del_r)/np.linalg.norm(np.sum(c*DF,axis=1))
+				commands = p*c
 				# commands = np.dot(np.linalg.pinv(DF),del_r)
 				for j, command in enumerate(commands):
 					self.s_joints[j].val += command
+
 					# if self.is_self_intersecting():
 					# 	self.s_joints[j].val -= command
 					# 	DF[:,j] = 0
