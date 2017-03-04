@@ -178,21 +178,20 @@ class Arm:
 					print("ERR: I am stuck")
 					return 0
 				pos_mat = self.get_arm_pos()
-				abs_angle = np.zeros(len(pos_mat)-1)
+				angles = np.zeros(len(pos_mat)-1)
 				for m in xrange(0,len(pos_mat)-2):
-					abs_angle[m] = np.dot(pos_mat[m]-pos_mat[m+1], pos_mat[m+1]-pos_mat[m+2])/(np.linalg.norm(pos_mat[m]-pos_mat[m+1])*np.linalg.norm(pos_mat[m+1]-pos_mat[m+2]))
+					angles[m] = calc_angle(pos_mat[m], pos_mat[m+1], pos_mat[m+2])
 				current_position = np.array(self.get_arm_pos()[-1])
 				del_r = (final_position-current_position)/(tot_steps-i)
 				c = np.zeros(len(self.rest_position)-1)
 				for k in xrange(0,len(self.rest_position)-1):
-					if k > 0 and np.isnan(abs_angle[k-1]) != True:
-						c[k] = np.dot(DF[:,k], del_r)*abs_angle[k-1]
+					if k > 0 and not np.isnan(angles[k-1]):
+						c[k] = np.dot(DF[:,k], del_r)*math.cos(angles[k-1])
 					else:
 						c[k] = np.dot(DF[:,k], del_r)
 
 				p = np.linalg.norm(del_r)/np.linalg.norm(np.sum(c*DF,axis=1))
 				commands = p*c
-				# commands = np.dot(np.linalg.pinv(DF),del_r)
 				for j, command in enumerate(commands):
 					self.s_joints[j].val += command
 					if self.is_self_intersecting():
@@ -413,6 +412,14 @@ def gen_cylinder(p1=[2,0,6], p2=[6,0,6], r=.75, resolution=15):
 def gen_sphere(p1, r=.75, resolution=50):
 	phi, lam = np.meshgrid(np.linspace(-math.pi/2, math.pi/2, resolution), np.linspace(0, 2*math.pi, resolution))
 	return r*np.cos(phi)*np.cos(lam)+p1[0], r*np.cos(phi)*np.sin(lam)+p1[1], r*np.sin(phi)+p1[2]
+
+
+def calc_angle(p0, p1, p2):
+    """ Returns the angle in radians between vectors 'v1' and 'v2' """
+    v1,v2 = p1-p0, p2-p1
+    cosang = np.dot(v1, v2)
+    sinang = np.linalg.norm(np.cross(v1, v2))
+    return np.arctan2(sinang, cosang)
 
 
 if __name__ == "__main__":
