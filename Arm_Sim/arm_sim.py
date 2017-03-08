@@ -190,19 +190,23 @@ class Arm:
 				c = np.zeros(len(self.rest_position)-1)
 				for k in xrange(0,len(self.rest_position)-1):
 					if k > 0 and not np.isnan(angles[k-1]):
-						c[k] = np.dot(DF[:,k], del_r)*(self.limits[k]-angles[k-1])
+						c[k] = np.dot(DF[:,k], del_r)*lock_discouragement_factor(self.limits[k],angles[k-1])
 					else:
 						c[k] = np.dot(DF[:,k], del_r)
 
 				p = np.linalg.norm(del_r)/np.linalg.norm(np.sum(c*DF,axis=1))
 				commands = p*c
-				for j, command in enumerate(commands):
+				success = True
+				for j, command in enumerate(commands): # enter the commands
 					self.s_joints[j].val += command
-					if self.is_self_intersecting():
-						self.s_joints[j].val -= command
+					if self.is_self_intersecting(): # if those commands made it break
 						DF[:,j] = 0
+						success = False
+						for k, c2 in enumerate(commands[:j+1]): # undo!
+							self.s_joints[k].val -= c2
 						break
-				break
+
+				if success:	break
 
 			self.history.append(self.get_arm_pos())
 			self.ax.cla()
@@ -427,18 +431,26 @@ def calc_angle(p0, p1, p2):
     return np.arctan2(sinang, cosang)
 
 
+def lock_discouragement_factor(limit_ang, actual_ang):
+	""" Defines a weight from 0 to 1 that affects the amount this arm should be utilized """
+	if abs(limit_ang-actual_ang) < math.pi/2:
+		return math.sin(limit_ang-actual_ang)
+	else:
+		return 1
+
+
 if __name__ == "__main__":
 
 	arm = Arm()
 	arm.add_joint([0,1,0], [0, 0, 0])
 	arm.add_joint([0,1,0], [2,0,6])
 	arm.add_joint([0,1,0], [6,0,6])
-	arm.add_joint([0,1,0], [10,0,8],0.5)
+	arm.add_joint([0,1,0], [10,0,8])
 	arm.add_joint([0,1,0], [13,0,8])
 	arm.add_joint([1,2,3], [14,0,5])
 	arm.compile()
 	arm.plot_arm(static_plot=False)
 	#arm.parameter_sweep()
-	arm.move_to([3,3,3])
+	arm.move_to([0,0,0])
 
 	plt.show()
