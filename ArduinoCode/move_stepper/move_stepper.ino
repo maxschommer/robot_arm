@@ -17,17 +17,15 @@
 
 #include <Stepper.h>
 
-const int stepsPerRevolution = 8;  // change this to fit the number of steps per revolution
+const int stepsPerRevolution = 200;  // change this to fit the number of steps per revolution
 // for your motor
 
 // initialize the stepper library on pins 8 through 11:
-Stepper myStepper(stepsPerRevolution, 0, 1, 2, 3);
+Stepper myStepper(stepsPerRevolution, 0,1,2,3);
 
 void setup() {
   // set the speed at 60 rpm:
-  myStepper.setSpeed(60);
-  
-  // initialize the serial port:
+  myStepper.setSpeed(60);  
 }
 
 void loop() {
