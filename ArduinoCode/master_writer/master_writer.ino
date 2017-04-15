@@ -1,25 +1,25 @@
-#include "usi_i2c_master.h"
+//Code for the Arduino Uno
+#define I2C_SLAVE_ADDRESS 0x4 // Address of the slave
 
-char i2c_transmit_buffer[3];
-char i2c_transmit_buffer_len;
-char i;
+#include <Wire.h>
 
-void setup() {
-  i2c_transmit_buffer_len = 3
-  i = 0x50;
+int x;
+
+void setup()
+{
+  Wire.begin(); // join i2c bus (address optional for master)
+  Serial.begin(9600); // start serial for output
+  x = 1;
 }
 
+void loop()
+{
+  Wire.beginTransmission(I2C_SLAVE_ADDRESS); // transmit to device #4
+  Wire.write(x);
+  Wire.endTransmission();
+  x ++;
+  if (x > 5)
+    x = 1;
 
-void loop() {
-  i2c_transmit_buffer[0] = (0x40 << 1) | 0  //Or'ing with 0 is antinecessary, but for clarity's sake this sets the R/W bit for a write.
-  
-  i2c_transmit_buffer[1] = 0x12;  //Internal address
-  
-  i2c_transmit_buffer[2] = i;  //Value to write
-  
-  //Transmit the I2C message
-  USI_I2C_Master_Start_Transmission(i2c_transmit_buffer, i2c_transmit_buffer_size);
-
-  i ++;
-  delay(10);
+  delay(10000);
 }
