@@ -1,25 +1,60 @@
-//Code for the Arduino Uno
-#define I2C_SLAVE_ADDRESS 0x4 // Address of the slave
+/*
+  Code for the Arduino
+  
+  Send a few test transmissions to the address 0x03 telling it
+  to move some arbitrary distances.
+ */
 
-#include <Wire.h>
+const int ADDRESS = 2*0+0;
 
-int x;
+const int CHAN0 = 2;
+const int CHAN1 = 3;
+const int FLAG = 4;
+const int DATA = 5;
+
+int x = 0;
+
 
 void setup()
 {
-  Wire.begin(); // join i2c bus (address optional for master)
-  Serial.begin(9600); // start serial for output
-  x = 1;
+  Serial.begin(9600);
 }
+
 
 void loop()
 {
-  Wire.beginTransmission(I2C_SLAVE_ADDRESS); // transmit to device #4
-  Wire.write(x);
-  Wire.endTransmission();
+  if (x%3 == 1)
+    transmit(HIGH, ADDRESS);
+  else
+    transmit(LOW, ADDRESS);
+  Serial.println(x%3==1);
   x ++;
-  if (x > 5)
-    x = 1;
 
-  delay(10000);
+  delay(5000);
 }
+
+
+void prepareToTransmit() {
+  pinMode(CHAN0, OUTPUT);
+  pinMode(CHAN1, OUTPUT);
+  pinMode(FLAG, OUTPUT);
+  pinMode(DATA, OUTPUT);
+
+  digitalWrite(CHAN0, LOW);
+  digitalWrite(CHAN1, LOW);
+  digitalWrite(FLAG, LOW);
+  digitalWrite(DATA, LOW);
+}
+
+
+void transmit(int val, int address) {
+  digitalWrite(CHAN0, address%2);
+  digitalWrite(CHAN1, address/2);
+  digitalWrite(DATA, val);
+  delay(1);
+  digitalWrite(FLAG, HIGH);
+  delay(1); //This delay is not entirely necessary, but it makes me sleep easier
+  digitalWrite(FLAG, LOW);
+  digitalWrite(DATA, LOW); //turn this off to conserve energy
+}
+

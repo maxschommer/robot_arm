@@ -1,70 +1,71 @@
-#define I2C_SLAVE_ADDRESS 0x4 // the 7-bit address (remember to change this when adapting this example)
-// Get this from https://goathub.com/rambo/TinyWire
-#include <TinyWireS.h>
-// The default buffer size, Can't recall the scope of defines right now
-#ifndef TWI_RX_BUFFER_SIZE
-#define TWI_RX_BUFFER_SIZE ( 16 )
-#endif
+/*
+  Code for the ATTiny24a
+  
+  Calibrate, then wait for a Jargon of Universal Serial Trash
+  Interface Ngahhh! signal. Upon signal, move the stepper motor
+  in the specified direction, assuming it does not put you over
+  the limit.
+ */
 
 #include <Stepper.h>
 
-volatile uint8_t i2c_regs[] =
-{
-    0xDE, 
-    0xAD, 
-    0xBE, 
-    0xEF, 
-};
+/* CHANGE THIS WHEN UPLOADING TO DIFFERENT DEVICES */
+const byte ADDRESS_MSB = HIGH;
+const byte ADDRESS_LSB = HIGH;
+/* CHANGE THIS WHEN UPLOADING TO DIFFERENT DEVICES */
 
-const int stepsPerRevolution = 200;  // change this to fit the number of steps per revolution
-// for your motor
+const byte CHAN0 = 2;
+const byte CHAN1 = 3;
+const byte FLAG = 4;
+const byte DATA = 5;
 
-// initialize the stepper library on pins 8 through 11:
-Stepper myStepper(stepsPerRevolution, 0, 1, 2, 3);
+const byte LIMIT = 1;
 
-int i = 0;
+const int stepsPerRevolution = 32;
+const int stepsPerStep = 512; //controls how much
+const int maxSteps = 6; //and how far it moves
 
-void setup()
-{
-  myStepper.setSpeed(60);
-  TinyWireS.begin(I2C_SLAVE_ADDRESS); // join i2c network
-  TinyWireS.onReceive(receiveEvent);
+// initialize the stepper library on pins 6 through 10:
+Stepper stepper(stepsPerRevolution, 6,7,9,10);
+
+byte location; //current position, between 0 and maxRevolutions
+byte prevFlag; //last value of FLAG
+
+
+void setup() {
+  
+  // set the speed at 60 rpm:
+  stepper.setSpeed(500);
+  
+  while (digitalRead(LIMIT) == LOW) {
+    stepper.step(-1);
+  }
+  stepper.step(256); //256 steps is about an eith revolution
+  location = 0;
+  
 }
 
-void loop()
-{
-  // This needs to be here
-  TinyWireS_stop_check();
+
+void loop() {
+  byte nextFlag = digitalRead(FLAG);
+  
+  if (nextFlag && !prevFlag) { //if the flag just flipped HIGH
+    if (digitalRead(CHAN0) == ADDRESS_LSB && digitalRead(CHAN1) == ADDRESS_MSB) { //if it wasn't talking to you
+      if (digitalRead(DATA)) { //if positive
+        if (location < stepsPerStep) {
+          stepper.step(stepsPerStep);
+          location ++;
+        }
+      }
+      else { //if negative
+        if (location > 0) {
+          stepper.step(-stepsPerStep);
+          location --;
+        }
+      }
+    }
+  }
+
+  prevFlag = nextFlag;
 }
 
-volatile byte reg_position;
-
-// Gets called when the ATtiny receives an i2c transmission
-void receiveEvent(uint8_t howMany)
-{
-  if (howMany < 1)
-  {
-    // Sanity-check
-    return;
-  }
-  if (howMany > TWI_RX_BUFFER_SIZE)
-  {
-    // Also insane number
-    return;
-  }
-
-  reg_position = TinyWireS.receive();
-  howMany--;
-  if (!howMany)
-  {
-    // This write was only to set the buffer for next read
-    return;
-  }
-  while(howMany--)
-  {
-    i2c_regs[reg_position % sizeof(i2c_regs)] = TinyWireS.receive();
-    reg_position++;
-  }
-
-  myStepper.step(i2c_regs[0]);
-}
